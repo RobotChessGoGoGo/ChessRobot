@@ -90,8 +90,8 @@ def findMoves(img1, img2):
 
 def safetoMove(H, cap, selectedCam):
 
-    cbPattern = cv2.imread(os.getcwd() + '/' +'interface_images/cb_pattern.jpg', cv2.IMREAD_GRAYSCALE)
-
+    cbPattern = cv2.imread('./ChessRobot/interface_images/cb_pattern.jpg', cv2.IMREAD_GRAYSCALE)
+    print(cbPattern)
     if selectedCam:
         for i in range(5):                    # Clear images stored in buffer
             cap.grab()

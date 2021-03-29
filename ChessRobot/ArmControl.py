@@ -3,11 +3,11 @@ from math import atan2, sqrt, cos, sin, acos, pi, copysign
 import time
 import os
 from gtts import gTTS
-import VisionModule as vm
-import lss
-import lss_const as lssc
+import ChessRobot.VisionModule as vm
+import ChessRobot.lss as lss
+import ChessRobot.lss_const as lssc
 import platform
-import Interface as inter
+import ChessRobot.Interface as inter
 import pdb
 
 if platform.system() == 'Windows':

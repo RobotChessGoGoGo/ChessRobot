@@ -1,5 +1,5 @@
 import PySimpleGUI as sg
-import ChessLogic as cl
+import ChessRobot.ChessLogic as cl
 import time
 import os
 import copy
@@ -8,12 +8,15 @@ import time
 import cv2
 import sys
 import json
-import VisionModule as vm
+import ChessRobot.VisionModule as vm
 import platform
-import ArmControl as ac
-import lss_const as lssc
+import ChessRobot.ArmControl as ac
+import ChessRobot.lss_const as lssc
 import pygame
 import pathlib
+import multiprocessing
+
+import FacialExpressionRecognition.visualization as facialExpressRecog
 
 try:
     from picamera.array import PiRGBArray
@@ -33,7 +36,7 @@ Dark
 
 #   GLOBAL VARIABLES
 
-CHESS_PATH = 'pieces_images'  # path to the chess pieces
+CHESS_PATH = './ChessRobot/pieces_images'  # path to the chess pieces
 
 BLANK = 0  # piece names
 PAWNW = 1
@@ -66,8 +69,8 @@ kingW = os.path.join(CHESS_PATH, 'nkingw.png')
 images = {BISHOPB: bishopB, BISHOPW: bishopW, PAWNB: pawnB, PAWNW: pawnW, KNIGHTB: knightB, KNIGHTW: knightW,
           ROOKB: rookB, ROOKW: rookW, KINGB: kingB, KINGW: kingW, QUEENB: queenB, QUEENW: queenW, BLANK: blank}
 
-wclock = os.getcwd() + '/interface_images/wclock.png'
-bclock = os.getcwd() + '/interface_images/bclock.png'
+wclock = './ChessRobot/interface_images/wclock.png'
+bclock = './ChessRobot/interface_images/bclock.png'
 FENCODE = ""
 
 colorTurn = True
@@ -82,7 +85,7 @@ state = "stby"
 newGameState = "config"
 gameTime = 60.00
 whiteSide = 0
-route = os.getcwd() + '/'
+route = './ChessRobot/'
 homography = []
 prevIMG = []
 chessRoute = ""
@@ -101,7 +104,7 @@ def systemConfig():
     global chessRoute
 
     if platform.system() == 'Windows':
-        chessRoute = "games/stockfishX64.exe"
+        chessRoute = "./ChessRobot/games/stockfishX64.exe"
     elif platform.system() == 'Linux':
         chessRoute = "/usr/games/stockfish"
 
@@ -160,6 +163,7 @@ def startEngine():
     engine.configure({"Skill Level": skillLevel})
     if playerColor == colorTurn:
         state = "playerTurn"
+        enterPlayerTurnState()
     else:
         state = "pcTurn"
 
@@ -366,7 +370,7 @@ def ocupiedBoard(): # gameState: ocupiedBoard
             newGameState = "config"
             break   
 
-    #newGameWindow.close() #todo
+    newGameWindow.close()
 
 def calibration(): # gameState: calibration
     global newGameState
@@ -640,9 +644,17 @@ window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_b
 
 def speak(command):
     pygame.mixer.init()
-    filePath = str(pathlib.Path().absolute())+"/audio/"
+    filePath = "./ChessRobot/audio/"
     pygame.mixer.music.load(filePath+command+".mp3")
     pygame.mixer.music.play()
+
+def enterPlayerTurnState():
+    ctrlQueue.put("ToRecordFacialExpression")
+    
+
+def leavePlayerTurnState():
+    ctrlQueue.get()
+    
 
 def main():
     global playerColor
@@ -667,7 +679,9 @@ def main():
     blackTime = 0
     refTime = time.time()
     board = cl.chess.Board()
-
+    facialExpressRecogProcess = None
+    global ctrlQueue
+    global msgQueue
     while True :
         button, value = window.Read(timeout=100)
 
@@ -735,6 +749,15 @@ def main():
                 speak("good_luck")
                 state = "stby"
                 redrawBoard(board)
+                print("start facial process!")
+                if facialExpressRecogProcess != None:
+                    facialExpressRecogProcess.close()
+                ctrlQueue = multiprocessing.Queue()
+                msgQueue = multiprocessing.Queue()
+                print("create process")
+                facialExpressRecogProcess = multiprocessing.Process(target = facialExpressRecog.start_facialExpress_recog_mod, args=(msgQueue, ctrlQueue))
+                print("start process")
+                facialExpressRecogProcess.start()
 
         elif state == "playerTurn": # Player Turn
             if button == "clockButton":
@@ -743,6 +766,7 @@ def main():
                 curIMG = vm.applyRotation(curIMG,rotMat)
                 squares = vm.findMoves(prevIMG, curIMG)
                 if playerTurn(board, squares):
+                    leavePlayerTurnState()
                     state = "pcTurn"
                     if board.is_game_over():
                         playing = False
@@ -768,6 +792,7 @@ def main():
             prevIMG = vm.applyHomography(previousIMG,homography)
             prevIMG = vm.applyRotation(prevIMG,rotMat)
             state = "playerTurn"
+            enterPlayerTurnState()
             window.FindElement(key = "robotMessage").Update("---")
             if board.turn:
                 window.FindElement(key = "clockButton").Update(image_filename=wclock)

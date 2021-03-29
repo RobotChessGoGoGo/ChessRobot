@@ -14,7 +14,7 @@ import serial
 from math import sqrt, atan, acos, fabs
 
 ### Import constants
-import lss_const as lssc
+import ChessRobot.lss_const as lssc
 
 ### Class functions
 def initBus(portName, portBaud):
