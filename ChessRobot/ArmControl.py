@@ -25,8 +25,8 @@ allMotors = lss.LSS(254)
 
 allMotors.setAngularStiffness(0)
 allMotors.setAngularHoldingStiffness(0)
-allMotors.setMaxSpeed(60)
-wrist.setMaxSpeed(120)
+allMotors.setMaxSpeed(30)
+
 gripper.setMaxSpeed(1200)
 
 CST_ANGLE_MIN = -90
@@ -40,7 +40,7 @@ def checkConstraints(value, min, max):
     return (value)
 
 # Desired positions in x, y, z, gripper aperture
-def LSS_IK(targetXYZG):
+def LSS_IK(targetXYZG, gripOffset):
 
     d1 = 4.055   # Bottom to shoulder
     d2 = 5.571   # Shoulder to elbow
@@ -83,7 +83,7 @@ def LSS_IK(targetXYZG):
     q3 = 180 - a3 * 180/pi
 
     # Wrist angle (degrees) (add 5 deg because of the wrist-gripper offset)
-    q4 = q0 - (q3 - q2) + 15
+    q4 = q0 - (q3 - q2) + gripOffset
 
     #  Add 15 deg because of the shoulder-elbow axis offset
     q2 = q2 + 15
@@ -179,12 +179,94 @@ def CBtoXY(targetCBsq, params, color):
 
     return(x,y)
 
-def executeMove(move, params, color, homography, cap, selectedCam):
+def getGripperOffset(idx, color):
+    offsets = [13, 11.5, 11.5, 11, 10.5, 10, 9.5, 9]
+    
+    if color:
+        return offsets[8 - int(idx)]
+    else:
+        return offsets[int(idx) - 1]
+    
+def getZOffset(idx, color):
+    offsets = [0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05, 0]
+    if color:
+        return offsets[8 - int(idx)]
+    else:
+        return offsets[int(idx) - 1]
+    
+def firstRotateWrist(square):
+    specialSquare = {'a1','h1', 'b1', 'g1'}
+    if square in specialSquare:
+        return True
+    else:
+        return False
 
+def testingExecuteMove(move, params, color):
+    allMotors.setColorLED(lssc.LSS_LED_Cyan)
+    z = params["cbHeight"] + params["pieceHeight"];
+    angles_rest = (0,-1150,450,1100,0)
+    gClose = -2.5
+    gOpen = -9
+    goDown = 0.6*params["pieceHeight"]
+    gripState = gOpen
+    for i in range(0,len(move),2):
+
+        # Move to position (up)
+        x, y = CBtoXY((move[i],move[i+1]), params, color)
+        angles_BSEWG1 = LSS_IK([x, y, z + 1 + getZOffset(move[i + 1], color), gripState], 0)
+        print("1) MOVE UP")
+        arrived1,issue1 = LSSA_moveMotors(angles_BSEWG1)
+        if not arrived1:
+            print("move stage 1 failed issue:", issue1)
+        time.sleep(1)
+        
+        # Go down
+        angles_BSEWG2 = LSS_IK([x, y, z - 1 - goDown + getZOffset(move[i + 1], color), gripState], getGripperOffset(move[i + 1],color))
+      
+        if firstRotateWrist(move[i] + move[i + 1]):
+            angleTmp = [ angles_BSEWG1[0], angles_BSEWG1[1], angles_BSEWG1[2], angles_BSEWG2[3], angles_BSEWG1[4]]
+            LSSA_moveMotors(angleTmp)
+        
+        shoulder.setMaxSpeed(10)
+        print("2) GO DOWN")
+        arrived2,issue2 = LSSA_moveMotors(angles_BSEWG2)
+        if not arrived2:
+            print("move stage 2 failed isuue:", issue2)
+        time.sleep(1)
+        shoulder.setMaxSpeed(30)
+        if (i/2)%2: # Uneven move (go lower to grab the piece)
+            gripState = gOpen
+            goDown = 0.6*params["pieceHeight"]
+        else:       # Even move (go a little higher to drop the piece)
+            gripState = gClose
+            goDown = 0.1*params["pieceHeight"]
+        time.sleep(1)
+
+        # Close / Open the gripper
+        gripper.moveCH(int(gripState*10), 500)
+        time.sleep(1)
+        print("3) CLOSE/OPEN the gripper\n")
+        
+        # Go up
+        angles_BSEWG3 = LSS_IK([x, y, z + 1 + getZOffset(move[i + 1], color), gripState], getGripperOffset(move[i + 1], color))
+        print("4) GO UP")
+        arrived3,issue3 = LSSA_moveMotors(angles_BSEWG3)
+        if not arrived3:
+            print("move stage 3 failed issue:", issue3)
+        time.sleep(1)
+    # Go back to resting position and go limp
+    print("5) REST")
+    moveState,_ = LSSA_moveMotors(angles_rest)
+    allMotors.limp()
+    allMotors.setColorLED(lssc.LSS_LED_Black)
+    return(moveState)
+    
+    
+def executeMove(move, params, color, homography, cap, selectedCam):
     allMotors.setColorLED(lssc.LSS_LED_Cyan)
     z = params["cbHeight"] + params["pieceHeight"]
     angles_rest = (0,-1150,450,1100,0)
-    gClose = -1.5
+    gClose = -2.5
     gOpen = -9
     goDown = 0.6*params["pieceHeight"]
     gripState = gOpen
@@ -193,35 +275,42 @@ def executeMove(move, params, color, homography, cap, selectedCam):
 
         # Move to position (up)
         x, y = CBtoXY((move[i],move[i+1]), params, color)
-        angles_BSEWG1 = LSS_IK([x, y, z + 1, gripState])
+        angles_BSEWG1 = LSS_IK([x, y, z + 1 + getZOffset(move[i + 1], color), gripState], 0)
         print("1) MOVE UP")
         arrived1,issue1 = LSSA_moveMotors(angles_BSEWG1)
         askPermision(angles_BSEWG1, arrived1, issue1, homography, cap, selectedCam)
-
+        time.sleep(1)
+        
         # Go down
-        angles_BSEWG2 = LSS_IK([x, y, z - 1 - goDown, gripState])
+        angles_BSEWG2 = LSS_IK([x, y, z - 1 - goDown + getZOffset(move[i + 1], color), gripState], getGripperOffset(move[i + 1],color))
+        if firstRotateWrist(move[i] + move[i + 1]):
+            angleTmp = [ angles_BSEWG1[0], angles_BSEWG1[1], angles_BSEWG1[2], angles_BSEWG2[3], angles_BSEWG1[4]]
+            LSSA_moveMotors(angleTmp)
+        shoulder.setMaxSpeed(10)
         print("2) GO DOWN")
         arrived2,issue2 = LSSA_moveMotors(angles_BSEWG2)
         askPermision(angles_BSEWG2, arrived2, issue2, homography, cap, selectedCam)
-
+        time.sleep(1)
+        shoulder.setMaxSpeed(30)
         if (i/2)%2: # Uneven move (go lower to grab the piece)
             gripState = gOpen
             goDown = 0.6*params["pieceHeight"]
         else:       # Even move (go a little higher to drop the piece)
             gripState = gClose
-            goDown = 0.5*params["pieceHeight"]
-
+            goDown = 0.1*params["pieceHeight"]
+        time.sleep(1)
+        
         # Close / Open the gripper
         gripper.moveCH(int(gripState*10), 500)
         time.sleep(1)
         print("3) CLOSE/OPEN the gripper\n")
         
         # Go up
-        angles_BSEWG3 = LSS_IK([x, y, z + 1, gripState])
+        angles_BSEWG3 = LSS_IK([x, y, z + 1 + getZOffset(move[i + 1], color), gripState], getGripperOffset(move[i + 1], color))
         print("4) GO UP")
         arrived3,issue3 = LSSA_moveMotors(angles_BSEWG3)
         askPermision(angles_BSEWG3, arrived3, issue3, homography, cap, selectedCam)
-
+        time.sleep(1)
     # Go back to resting position and go limp
     print("5) REST")
     moveState,_ = LSSA_moveMotors(angles_rest)
