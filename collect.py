@@ -81,8 +81,8 @@ def get_output(opt, img):
     return False, None, None
 
 def save_results_csv(results, results_path, idx):
-    while len(results) < 90 :
-        results.append(results[-1])
+    # while len(results) < 90 :
+    #     results.append(results[-1])
     data = pd.DataFrame(results)
     data.to_csv(os.path.join(results_path, str(idx)) + '.csv')
 
