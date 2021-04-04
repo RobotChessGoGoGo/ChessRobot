@@ -17,6 +17,7 @@ import pathlib
 import multiprocessing
 
 import FacialExpressionRecognition.visualization as facialExpressRecog
+import chessBotConst as cbConst
 
 try:
     from picamera.array import PiRGBArray
@@ -654,6 +655,11 @@ def enterPlayerTurnState():
 
 def leavePlayerTurnState():
     ctrlQueue.get()
+    retval = []
+    while not msgQueue.empty():
+        retval.append(msgQueue.get())
+    print(retval)
+    return retval
     
 
 def main():
@@ -753,7 +759,7 @@ def main():
                 if facialExpressRecogProcess != None:
                     facialExpressRecogProcess.close()
                 ctrlQueue = multiprocessing.Queue()
-                msgQueue = multiprocessing.Queue()
+                msgQueue = multiprocessing.Queue(cbConst.FacialExpressionMsgQueueMaxLen)
                 print("create process")
                 facialExpressRecogProcess = multiprocessing.Process(target = facialExpressRecog.start_facialExpress_recog_mod, args=(msgQueue, ctrlQueue))
                 print("start process")

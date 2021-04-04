@@ -5,8 +5,11 @@ import pdb
 import torch
 import torch.nn.functional as F
 import multiprocessing
+import chessBotConst as cbConst
 from torchvision import transforms
 from PIL import Image
+from time import time
+
 
 #file_root = os.getcwd()
 # file_root = sys.path.append(os.getcwd())
@@ -34,7 +37,8 @@ def load_img(path, transformation, device):
     img = img.unsqueeze(0)
     return img.to(device)
 
-def start_facialExpress_recog_mod(queue, ctrlQueue):
+
+def start_facialExpress_recog_mod(msgQueue, ctrlQueue):
     print("enter facialExpress recog!")
     opt = Opt()
     device = opt.device
@@ -50,6 +54,8 @@ def start_facialExpress_recog_mod(queue, ctrlQueue):
 
         # To capture video from webcam.
         cap = cv2.VideoCapture(1)
+        
+        lastPredictTime = time();
         while True:
             
             # Read the frame
@@ -79,7 +85,16 @@ def start_facialExpress_recog_mod(queue, ctrlQueue):
             classs = torch.argmax(pred,1)
             prediction = classes[classs.item()] #This is what we need for DDA!!!
             if ctrlQueue != None and ctrlQueue.empty() == False:#process communication with chess robot, if ctrlQueue not empty write prdection to anotherQueue
-                print("Write predicion to queue");
+                curTime = time()
+                if curTime - lastPredictTime > cbConst.SampleFacialExpressionTimeGap:
+                    print("write to msgQueue")
+                    if msgQueue.full():
+                        msgQueue.get()
+                    toTransMsg = torch.squeeze(pred.cpu().detach()).numpy().tolist()
+                    msgQueue.put(toTransMsg)
+                    print(toTransMsg)
+                    lastPredictTime = curTime
+                    
             font = cv2.FONT_HERSHEY_SIMPLEX
             org = (50, 50)
             fontScale = 1
