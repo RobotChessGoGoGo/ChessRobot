@@ -114,12 +114,18 @@ def main():
     results = []
     vc = cv2.VideoCapture(0)
     last_time = 0
-
+    pre_state = False
     while True:
         _, img = vc.read()
         pred_img = img.copy()
 
         button, value = window.Read(timeout=100)
+        cur_state = value['start']
+
+        if pre_state == False and cur_state == True:
+            results = []
+        pre_state = cur_state
+
         if button == sg.WIN_CLOSED:  # if user closes window
             break
 
