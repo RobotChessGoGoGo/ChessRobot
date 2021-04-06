@@ -14,6 +14,7 @@ class CustomDataset(Dataset):
     def __init__(self):
         self.path = './data/datasets/train'
         self.data_list = os.listdir('./data/datasets/train')
+        self.data_list.sort()
         self.label = './data/datasets/label/label.csv'
 
 
@@ -21,6 +22,7 @@ class CustomDataset(Dataset):
         if torch.is_tensor(index):
             index = index.tolist()
         file = self.data_list[index]
+        file_idx = int(file[: -4])
         data = pd.read_csv(os.path.join(self.path, file), index_col=0).astype('float')
         data = np.array(data)
 
@@ -38,7 +40,8 @@ class CustomDataset(Dataset):
         data = padded_data
         data = torch.tensor(data).float()
         label = pd.read_csv(self.label).astype('float')
-        label = label['label'][index]
+        print("file: ", file, "label_idx: ", label['idx'][file_idx - 1])
+        label = label['label'][file_idx - 1]
         # label = np.array([1, 0]) if label == 0 else np.array([0, 1])
         label = torch.tensor(label).float()
         sample = {'data': data, 'label': label}
