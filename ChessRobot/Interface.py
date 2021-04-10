@@ -19,6 +19,8 @@ import multiprocessing
 import FacialExpressionRecognition.visualization as facialExpressRecog
 import chessBotConst as cbConst
 
+import ChessRobot.img2feeling as img2feeling
+
 try:
     from picamera.array import PiRGBArray
     from picamera import PiCamera
@@ -92,7 +94,18 @@ prevIMG = []
 chessRoute = ""
 detected = True
 selectedCam = 0
-skillLevel = 10     # Chess engine difficulty level
+#hardSkillLevel = 2
+#easySkillLevel = 1
+skillLevel = 2     # Chess engine difficulty level
+
+hardAiThinkingDepth = 15
+easyAiThinkingDepth = 1
+aiThinkingDepth = 15
+
+hardAiSearchNodes = 100000
+easyAiSearchNodes = 1
+aiSearchNodes = 100000
+
 cap = cv2.VideoCapture()
 rotMat = vm.np.zeros((2,2))
 physicalParams = {"baseradius": 0.00,
@@ -100,6 +113,8 @@ physicalParams = {"baseradius": 0.00,
                     "sqSize": 0.00,
                     "cbHeight": 0.00,
                     "pieceHeight": 0.00}
+emotionRecordLen = 2
+
 
 def systemConfig():
     global chessRoute
@@ -119,7 +134,7 @@ def pcTurn(board,engine):
     global selectedCam
     
     command = ""
-    pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
+    pcMove = engine.play(board, cl.chess.engine.Limit(depth = aiThinkingDepth, nodes = aiSearchNodes, time=1))
     sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
     
     window.FindElement(key = "gameMessage").Update(sequence["type"])
@@ -661,6 +676,41 @@ def leavePlayerTurnState():
     print(retval)
     return retval
     
+def getPlayerfeelingByEmotionInfo(emotionInfo):
+    feeling = img2feeling.get_feeling_output(img2feelingOpt, emotionInfo)
+    if feeling == 0:
+        return 'Easy'
+    else:
+        return 'Hard'
+
+def dynamicDiffcultyAdj(feeling):
+    global emotionRecArr
+    try:
+        _ = emotionRecArr
+    except NameError:
+        emotionRecArr = []
+
+    if feeling == 'Easy':
+        emotionRecArr.append(0)
+    elif feeling == 'Hard':
+        emotionRecArr.append(1)
+        
+    if len(emotionRecArr) >= emotionRecordLen:
+        s = sum(emotionRecArr)
+        emotionRecArr = []
+        if s == emotionRecordLen:
+            print("Too hard, change to easy mode")
+            #skillLevel = easySkillLevel
+            aiThinkingDepth = easyAiThinkingDepth
+            aiSearchNodes = easyAiSearchNodes
+            #engine.configure({"Skill Level": skillLevel})
+        elif s == 0:
+            print("Too easy, change to hard mode")
+            #skillLevel = hardSkillLevel
+            aiThinkingDepth = hardAiThinkingDepth
+            aiSearchNodes = hardAiSearchNodes
+            #engine.configure({"Skill Level": skillLevel})
+    
 
 def main():
     global playerColor
@@ -688,6 +738,9 @@ def main():
     facialExpressRecogProcess = None
     global ctrlQueue
     global msgQueue
+    global img2feelingOpt
+    img2feelingOpt = img2feeling.Opt()
+    
     while True :
         button, value = window.Read(timeout=100)
 
@@ -772,11 +825,16 @@ def main():
                 curIMG = vm.applyRotation(curIMG,rotMat)
                 squares = vm.findMoves(prevIMG, curIMG)
                 if playerTurn(board, squares):
-                    leavePlayerTurnState()
+                    playerEmotionVal = leavePlayerTurnState()
+                    playerFeeling = getPlayerfeelingByEmotionInfo(playerEmotionVal)
+                    print("This turn, human player's feeling is:", playerFeeling)
+                    
                     state = "pcTurn"
                     if board.is_game_over():
                         playing = False
                         state = "showGameResult"
+                    else: #if the game not over, try to do some dda 
+                        dynamicDiffcultyAdj(playerFeeling)
                 else:
                     window.FindElement(key = "gameMessage").Update("Invalid move!")
                     speak("invalid_move")

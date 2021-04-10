@@ -176,13 +176,13 @@ def ui():
 
 class Opt():
   def __init__(self):
-    self.mlp_model_path = '../Emotion2Feeling/model/latest_model.pth'
+    self.mlp_model_path = './Emotion2Feeling/model/latest_model.pth'
     self.mlp_net = MLPNet()
     self.mlp_net = self.mlp_net.load_state_dict(torch.load(self.mlp_model_path))
-    self.emotion_model_path = '../FacialExpressionRecognition/model/deep_emotion-500-128-0.005.pt'
-    self.emotion_net = DeepEmotion()
-    self.emotion_net = self.emotion_net.load_state_dict(torch.load(self.emotion_model_path))
-    self.frontalface = '../FacialExpressionRecognition/tools/haarcascade_frontalface_default.xml'
+    self.emotion_model_path = './FacialExpressionRecognition/model/deep_emotion-500-128-0.005.pt'
+    #self.emotion_net = DeepEmotion()
+    #self.emotion_net = self.emotion_net.load_state_dict(torch.load(self.emotion_model_path))
+    self.frontalface = './FacialExpressionRecognition/tools/haarcascade_frontalface_default.xml'
     # self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # self.datasets = './Emotion2Feeling/data/datasets'
