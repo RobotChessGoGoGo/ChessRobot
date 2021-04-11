@@ -4,7 +4,6 @@ import time
 import os
 import copy
 import threading
-import time
 import cv2
 import sys
 import json
@@ -78,15 +77,15 @@ FENCODE = ""
 
 colorTurn = True
 graveyard = 'k0'
-playerColor = True
+playerColor = False
 playing =  False
-blackSquareColor = '#B58863'
-whiteSquareColor = '#F0D9B5'
+blackSquareColor = '#444444'
+whiteSquareColor = '#FFFFFF'
 Debug = False
 sequence = []
 state = "stby"
 newGameState = "config"
-gameTime = 60.00
+# gameTime = 60.00
 whiteSide = 0
 route = './ChessRobot/'
 homography = []
@@ -201,12 +200,13 @@ def playerTurn(board,squares):
         return False
 
 def startGame():
-    global gameTime
+    # global gameTime
     window.FindElement("newGame").Update(disabled=True)
     window.FindElement("quit").Update(disabled=False)
-    window.FindElement(key = "wcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
-    window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
-    window.FindElement(key = "clockButton").Update(image_filename=wclock)
+    # window.FindElement(key = "wcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
+    # window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
+    # window.FindElement(key = "clockButton").Update(image_filename=wclock)
+    window.FindElement(key = "textMessage").Update("White Turn")
     window.FindElement(key = "robotMessage").Update("Good Luck!")
     window.FindElement(key = "gameMessage").Update("--")
 
@@ -435,7 +435,7 @@ def calibration(): # gameState: calibration
 
 def newGameWindow (): # gameState: config
     global playerColor
-    global gameTime
+    # global gameTime
     global newGameState
     global state
     global detected
@@ -444,12 +444,10 @@ def newGameWindow (): # gameState: config
     global skillLevel
 
     windowName = "Configuration"
-    frame_layout = [[sg.Radio('RPi Cam', group_id='grp', default = True, key = "rpicam"), sg.VerticalSeparator(pad=None), sg.Radio('USB0', group_id='grp', key = "usb0"), sg.Radio('USB1', group_id='grp', key = "usb1")]]
+    frame_layout = [[sg.Radio('USB0', group_id='grp', key = "usb0", default=True), sg.Radio('USB1', group_id='grp', key = "usb1")]]
 
     initGame = [[sg.Text('Game Parameters', justification='center', pad = (25,(5,15)), font='Any 15')],
-                [sg.CBox('Play as White', key='userWhite', default = playerColor)],
-                [sg.Spin([sz for sz in range(1, 300)], initial_value=10, font='Any 11',key='timeInput'),sg.Text('Game time (min)', pad=(0,0))],
-                [sg.Combo([sz for sz in range(1, 11)], default_value=10, key="enginelevel"),sg.Text('Engine skill level', pad=(0,0))],
+                [sg.CBox('Player Play as White', key='userWhite', default = playerColor)],
                 [sg.Frame('Camera Selection', frame_layout, pad=(0, 10), title_color='white')],
                 [sg.Text('_'*30)],
                 [sg.Button("Exit"), sg.Submit("Next")]]
@@ -457,9 +455,7 @@ def newGameWindow (): # gameState: config
     while True:
         button,value = windowNewGame.Read()
         if button == "Next":
-            if value["rpicam"] == True:
-                selectedCam = 0
-            elif value["usb0"] == True:
+            if value["usb0"] == True:
                 selectedCam = 1
             elif value["usb1"] == True:
                 selectedCam = 2
@@ -467,8 +463,9 @@ def newGameWindow (): # gameState: config
             if detected:
                 newGameState = "calibration"
                 playerColor = value["userWhite"]
-                skillLevel = value["enginelevel"]*2
-                gameTime = float(value["timeInput"]*60)
+                # skillLevel = value["enginelevel"]*2
+                skillLevel = 20
+                # gameTime = float(value["timeInput"]*60)
             break
         if button in (None, 'Exit'): # MAIN WINDOW
             state = "stby"
@@ -554,8 +551,8 @@ def quitGameWindow ():
 
 def mainBoardLayout():
     # ------ Menu Definition ------ #      
-    menu_def = [['&Configuration',["&Dimensions","E&xit"]],      
-                ['&Help', 'About'], ]  
+    # menu_def = [['&Configuration',["&Dimensions","E&xit"]],      
+    #             ['&Help', 'About'], ]  
 
     # ------ Layout ------ # 
     # sg.SetOptions(margins=(0,0))
@@ -579,16 +576,17 @@ def mainBoardLayout():
     frame_layout_robot = [
                 [sg.Button('---', size=(14, 2), border_width=0,  font=('courier', 16), button_color=('black', "white"), pad=(4, 4), key="robotMessage")],
                 ]
+    frame_layout_text = [
+                [sg.Button('---', size=(14, 2), border_width=0,  font=('courier', 16), button_color=('black', "white"), pad=(4, 4), key="textMessage")],
+                ]
     board_controls = [[sg.RButton('New Game', key='newGame', size=(15, 2), pad=(0,(0,7)), font=('courier', 16))],
                         [sg.RButton('Quit', key='quit', size=(15, 2), pad=(0, 0), font=('courier', 16), disabled = True)],
                         [sg.Frame('GAME', frame_layout_game, pad=(0, 10), font='Any 12', title_color='white', key = "frameMessageGame")],
                         [sg.Frame('ROBOT', frame_layout_robot, pad=(0, (0,10)), font='Any 12', title_color='white', key = "frameMessageRobot")],
-                        [sg.Button('White Time', size=(7, 2), border_width=0,  font=('courier', 16), button_color=('black', whiteSquareColor), pad=(0, 0), key="wt"),sg.Button('Black Time',  font=('courier', 16), size=(7, 2), border_width=0, button_color=('black', blackSquareColor), pad=((7,0), 0), key="bt")],
-                        [sg.T("00:00:00",size=(9, 2), font=('courier', 13),key="wcount",pad = ((4,0),0)),sg.T("00:00:00",size=(9, 2), pad = (0,0), font=('courier', 13),key="bcount")],
-                        [sg.Button('', image_filename=wclock, key='clockButton', pad = ((25,0),0))]]
+                        [sg.Frame('Display_turn', frame_layout_text, pad=(0, 10), font='Any 12', title_color='white', key = "frameMessageText")],
+                        [sg.Button('End my turn', key='clockButton', size=(15, 2),pad=(0,(0,7)), font=('courier', 16))]]
 
-    layout = [[sg.Menu(menu_def, tearoff=False, key="manubar")], 
-                [sg.Column(board_layout),sg.VerticalSeparator(pad=None),sg.Column(board_controls)]]
+    layout = [[sg.Column(board_layout),sg.VerticalSeparator(pad=None),sg.Column(board_controls)]]
 
     return layout
 
@@ -625,6 +623,7 @@ def loadParams():
         outfile = open('params.txt', 'w')
         json.dump(physicalParams, outfile)
 
+"""
 def phisicalConfig ():
     global physicalParams
     
@@ -654,9 +653,10 @@ def phisicalConfig ():
             break   
 
     robotParamWindow.close()   
-
+"""
 layout = mainBoardLayout()
-window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_buttons=False, icon='interface_images/robot_icon.ico').Layout(layout)
+window = sg.Window('ChessRobot', default_button_element_size=(12,1), button_color = ["#000000", "#6699ff"], auto_size_buttons=False).Layout(layout)
+
 
 def speak(command):
     pygame.mixer.init()
@@ -729,34 +729,26 @@ def main():
     systemConfig()
     loadParams()
     interfaceMessage = ""
-    board = cl.chess.Board()
+    # board = cl.chess.Board()
     squares = []
-    whiteTime = 0
-    blackTime = 0
-    refTime = time.time()
+    # whiteTime = 0
+    # blackTime = 0
+    # refTime = time.time()
     board = cl.chess.Board()
     facialExpressRecogProcess = None
     global ctrlQueue
     global msgQueue
     global img2feelingOpt
     img2feelingOpt = img2feeling.Opt()
-    
     while True :
         button, value = window.Read(timeout=100)
 
-        if button in (None, 'Exit') or value["manubar"]=="Exit": # MAIN WINDOW
+        if button in (None, 'Exit'): # or value["manubar"]=="Exit": # MAIN WINDOW
             angles_rest = (0,-1150,450,1100,0)
             _ = ac.LSSA_moveMotors(angles_rest)
             ac.allMotors.limp()
             ac.allMotors.setColorLED(lssc.LSS_LED_Black)
             break
-
-        if value["manubar"]=="Dimensions":
-            if playing:
-                sg.popup("Please, first quit the game")
-            else:
-                phisicalConfig()
-
         if button =="newGame":
             if physicalParams["baseradius"] and physicalParams["cbFrame"] and physicalParams["sqSize"] and physicalParams["cbHeight"] and physicalParams["pieceHeight"]: 
                 state = "startMenu"
@@ -770,6 +762,7 @@ def main():
                 state = "showGameResult"
 
         # PC messages
+        """
         if playing:
             if  whiteTime <= 0:
                 playing = False
@@ -779,7 +772,7 @@ def main():
                 playing = False
                 state = "showGameResult"
                 window.FindElement(key = "gameMessage").Update("Time Out\n"+ "White Wins")
-
+        """
         if state == "stby": # stby
             pass
 
@@ -800,9 +793,9 @@ def main():
                     board = cl.chess.Board(FENCODE)
                 colorTurn = board.turn
                 startGame()
-                whiteTime = gameTime
-                blackTime = gameTime
-                refTime = time.time()
+                # whiteTime = gameTime
+                # blackTime = gameTime
+                # refTime = time.time()
                 startEngineThread = threading.Thread(target=startEngine, daemon=True)
                 startEngineThread.start()
                 speak("good_luck")
@@ -843,9 +836,11 @@ def main():
         elif state == "pcTurn": # PC turn
             
             if board.turn:
-                window.FindElement(key = "clockButton").Update(image_filename=wclock)
+                # window.FindElement(key = "clockButton").Update(image_filename=wclock)
+                window.FindElement(key = "textMessage").Update("White Turn")
             else:
-                window.FindElement(key = "clockButton").Update(image_filename=bclock)
+                # window.FindElement(key = "clockButton").Update(image_filename=bclock)
+                window.FindElement(key = "textMessage").Update("Black Turn")
                 
             pcTurnThread = threading.Thread(target=pcTurn, args=(board,engine,), daemon=True)
             pcTurnThread.start()
@@ -859,9 +854,11 @@ def main():
             enterPlayerTurnState()
             window.FindElement(key = "robotMessage").Update("---")
             if board.turn:
-                window.FindElement(key = "clockButton").Update(image_filename=wclock)
+                # window.FindElement(key = "clockButton").Update(image_filename=wclock)
+                window.FindElement(key = "textMessage").Update("White Turn")
             else:
-                window.FindElement(key = "clockButton").Update(image_filename=bclock)
+                # window.FindElement(key = "clockButton").Update(image_filename=bclock)
+                window.FindElement(key = "textMessage").Update("Black Turn")
 
         elif state == "showGameResult":
             gameResult = board.result()
@@ -884,7 +881,8 @@ def main():
             window.FindElement(key = "robotMessage").Update("Goodbye")
             quitGame()
             state = "stby"
-            
+
+        """
         if playing:
             dt = time.time() - refTime
             if board.turn:
@@ -899,6 +897,7 @@ def main():
                     blackTime = 0
                 refTime = time.time()
                 window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(blackTime)))
+        """
 
     window.close() 
     
